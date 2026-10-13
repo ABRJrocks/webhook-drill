@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webhook-drill"
+version = "0.1.0"
+description = "Repeatable webhook reliability tests with application-state assertions and CI reports"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Abdul Rafay"}]
+dependencies = []
+keywords = ["webhooks", "testing", "idempotency", "ci", "stripe", "github"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Testing",
+]
+
+[project.urls]
+Repository = "https://github.com/ABRJrocks/webhook-drill"
+Issues = "https://github.com/ABRJrocks/webhook-drill/issues"
+
+[project.scripts]
+webhook-drill = "webhook_drill.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
