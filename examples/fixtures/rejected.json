@@ -1,0 +1,6 @@
+{
+  "id": "{{run_id}}-rejected-event",
+  "entity": "{{run_id}}-rejected",
+  "revision": 1,
+  "status": "ready"
+}

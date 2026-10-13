@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "GitHub signature and duplicate delivery",
+  "signing": {"provider": "github", "secret_env": "WEBHOOK_DRILL_SECRET"},
+  "headers": {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "demo-delivery"},
+  "scenarios": [{
+    "name": "One event, three deliveries",
+    "steps": [
+      {"name": "Deliver a signed fixture", "send": {
+        "path": "/webhooks", "repeat": 3, "concurrency": 3,
+        "body": {"id": "{{run_id}}-github", "entity": "{{run_id}}-github", "revision": 1, "status": "ready"},
+        "expect": {"status": [200]}
+      }},
+      {"name": "Check application-side deduplication", "probe": {
+        "path": "/state/{{run_id}}-github", "expect": {"status": [200], "json": {"/processed": 1}}
+      }},
+      {"name": "Reject an altered raw body", "send": {
+        "path": "/webhooks", "signature": "tampered",
+        "body": {"id": "{{run_id}}-github-tampered", "entity": "{{run_id}}-github", "revision": 2, "status": "altered"},
+        "expect": {"status": [401]}
+      }}
+    ]
+  }]
+}

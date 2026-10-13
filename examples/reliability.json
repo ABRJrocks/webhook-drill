@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "name": "Webhook reliability",
+  "signing": {"provider": "stripe", "secret_env": "WEBHOOK_DRILL_SECRET"},
+  "scenarios": [
+    {
+      "name": "Concurrent duplicate delivery",
+      "steps": [
+        {"name": "Deliver the same event eight times", "send": {
+          "path": "/webhooks", "body_file": "fixtures/duplicate.json",
+          "repeat": 8, "concurrency": 4, "expect": {"status": [200]}
+        }},
+        {"name": "Only one side effect occurred", "probe": {
+          "path": "/state/{{run_id}}-duplicate", "eventually": 2,
+          "expect": {"status": [200], "json": {"/processed": 1, "/revision": 1, "/status": "ready"}}
+        }}
+      ]
+    },
+    {
+      "name": "Out-of-order domain revisions",
+      "steps": [
+        {"name": "Deliver the newer revision first", "send": {
+          "path": "/webhooks", "body": {"id": "{{run_id}}-newer", "entity": "{{run_id}}-ordered", "revision": 2, "status": "approved"},
+          "expect": {"status": [200]}
+        }},
+        {"name": "Deliver an older revision late", "send": {
+          "path": "/webhooks", "delay_ms": 20,
+          "body": {"id": "{{run_id}}-older", "entity": "{{run_id}}-ordered", "revision": 1, "status": "pending"},
+          "expect": {"status": [200]}
+        }},
+        {"name": "State was not rolled back", "probe": {
+          "path": "/state/{{run_id}}-ordered",
+          "expect": {"status": [200], "json": {"/revision": 2, "/status": "approved", "/processed": 2}}
+        }}
+      ]
+    },
+    {
+      "name": "Transient failure recovery",
+      "steps": [
+        {"name": "Retry after a synthetic 503", "send": {
+          "path": "/webhooks/flaky", "body": {"id": "{{run_id}}-retry", "entity": "{{run_id}}-retry", "revision": 1, "status": "ready"},
+          "retry": {"attempts": 3, "base_delay": 0.02, "max_delay": 0.1},
+          "expect": {"status": [200]}
+        }},
+        {"name": "Recovery committed one result", "probe": {
+          "path": "/state/{{run_id}}-retry", "expect": {"status": [200], "json": {"/processed": 1}}
+        }}
+      ]
+    },
+    {
+      "name": "Signature rejection",
+      "steps": [
+        {"name": "Reject a forged signature", "send": {
+          "path": "/webhooks", "signature": "invalid", "body_file": "fixtures/rejected.json", "expect": {"status": [401]}
+        }},
+        {"name": "Reject a missing signature", "send": {
+          "path": "/webhooks", "signature": "missing", "body_file": "fixtures/rejected.json", "expect": {"status": [401]}
+        }},
+        {"name": "Reject a stale signed timestamp", "send": {
+          "path": "/webhooks", "signature": "stale", "body_file": "fixtures/rejected.json", "expect": {"status": [401]}
+        }},
+        {"name": "Reject tampering after signing", "send": {
+          "path": "/webhooks", "signature": "tampered", "body_file": "fixtures/rejected.json", "expect": {"status": [401]}
+        }},
+        {"name": "Rejected deliveries made no changes", "probe": {
+          "path": "/state/{{run_id}}-rejected", "expect": {"status": [200], "json": {"/processed": 0}}
+        }}
+      ]
+    }
+  ]
+}

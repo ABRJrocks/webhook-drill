@@ -1,0 +1,6 @@
+{
+  "id": "{{run_id}}-duplicate-event",
+  "entity": "{{run_id}}-duplicate",
+  "revision": 1,
+  "status": "ready"
+}
