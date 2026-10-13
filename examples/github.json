@@ -2,7 +2,7 @@
   "version": 1,
   "name": "GitHub signature and duplicate delivery",
   "signing": {"provider": "github", "secret_env": "WEBHOOK_DRILL_SECRET"},
-  "headers": {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "demo-delivery"},
+  "headers": {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "{{run_id}}-delivery"},
   "scenarios": [{
     "name": "One event, three deliveries",
     "steps": [

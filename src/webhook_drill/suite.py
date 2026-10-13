@@ -82,7 +82,7 @@ def _number(value: Any, low: float, high: float, where: str, integer=False):
 def _name(value: Any, where: str) -> str:
     if not isinstance(value, str) or not value.strip() or len(value) > 160:
         raise SuiteError(f"{where}: expected a nonempty string up to 160 characters")
-    if any(ord(c) < 32 for c in value):
+    if any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in value):
         raise SuiteError(f"{where}: control characters are not allowed")
     return value
 
@@ -100,7 +100,7 @@ def _path(value: Any, run_id: str, where: str) -> str:
     return value
 
 
-def _headers(value: Any, env: Mapping[str, str], where: str) -> dict[str, str]:
+def _headers(value: Any, env: Mapping[str, str], where: str, run_id: str) -> dict[str, str]:
     if not isinstance(value, dict):
         raise SuiteError(f"{where}: expected an object")
     result = {}
@@ -117,6 +117,8 @@ def _headers(value: Any, env: Mapping[str, str], where: str) -> dict[str, str]:
             item = env.get(variable)
             if not item:
                 raise SuiteError(f"{where}: missing environment variable {variable}")
+        elif isinstance(item, str):
+            item = item.replace(TOKEN, run_id)
         if (not isinstance(item, str) or len(item) > 8192
                 or any(ord(c) < 32 or ord(c) > 255 for c in item)):
             raise SuiteError(f"{where}: invalid header value")
@@ -140,7 +142,7 @@ def _expect(value: Any, where: str) -> dict[str, Any]:
             raise SuiteError(f"{where}.status: expected a nonempty status list")
         for status in statuses:
             _number(status, 100, 599, where + ".status", integer=True)
-    elif item["error"] not in {"timeout", "connection", "response_too_large"}:
+    elif not isinstance(item["error"], str) or item["error"] not in {"timeout", "connection", "response_too_large"}:
         raise SuiteError(f"{where}.error: unknown transport error")
     for section in ("json", "headers"):
         if section in item and not isinstance(item[section], dict):
@@ -194,15 +196,15 @@ def load_suite(path: str | Path, run_id: str, env: Mapping[str, str] | None = No
     if "signing" in root:
         signing = _object(root["signing"], {"provider", "secret_env"}, "signing")
         provider = signing.get("provider")
-        if provider not in {"github", "stripe"}:
+        if not isinstance(provider, str) or provider not in {"github", "stripe"}:
             raise SuiteError("signing.provider: expected github or stripe")
         variable = signing.get("secret_env", "")
         if not isinstance(variable, str) or not ENV_NAME.fullmatch(variable):
             raise SuiteError("signing.secret_env: invalid environment variable")
         secret = env.get(variable, "")
-        if not secret:
+        if not isinstance(secret, str) or not secret:
             raise SuiteError(f"signing: missing environment variable {variable}")
-    headers = _headers(root.get("headers", {}), env, "suite.headers")
+    headers = _headers(root.get("headers", {}), env, "suite.headers", run_id)
     items = root.get("scenarios")
     if not isinstance(items, list) or not 1 <= len(items) <= 100:
         raise SuiteError("suite.scenarios: expected 1 to 100 scenarios")
@@ -231,7 +233,7 @@ def load_suite(path: str | Path, run_id: str, env: Mapping[str, str] | None = No
             allowed |= {"body", "body_file", "signature", "repeat", "concurrency", "delay_ms", "retry"} if kind == "send" else {"eventually", "interval"}
             spec = _object(value[kind], allowed, where + "." + kind)
             route = _path(spec.get("path"), run_id, where + ".path")
-            step_headers = _merge_headers(headers, _headers(spec.get("headers", {}), env, where + ".headers"))
+            step_headers = _merge_headers(headers, _headers(spec.get("headers", {}), env, where + ".headers", run_id))
             timeout = _number(spec.get("timeout", 5), .01, 60, where + ".timeout")
             body, mode, repeat, concurrency, delay = b"", "valid", 1, 1, 0
             attempts, base_delay, max_delay, eventually, interval = 1, .1, 2., 0., .1
@@ -254,7 +256,7 @@ def load_suite(path: str | Path, run_id: str, env: Mapping[str, str] | None = No
                 if len(body) > MAX_BYTES:
                     raise SuiteError(f"{where}: body exceeds 1 MiB")
                 mode = spec.get("signature", "valid")
-                if mode not in {"valid", "invalid", "missing", "tampered", "stale"}:
+                if not isinstance(mode, str) or mode not in {"valid", "invalid", "missing", "tampered", "stale"}:
                     raise SuiteError(f"{where}: invalid signature mode")
                 if mode != "valid" and not provider:
                     raise SuiteError(f"{where}: signature modes require suite.signing")

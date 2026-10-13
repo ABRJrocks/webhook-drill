@@ -48,6 +48,10 @@ def _equal(actual: Any, expected: Any) -> bool:
     return actual == expected
 
 
+def _nonfinite(_):
+    raise ValueError("non-finite JSON value")
+
+
 def assertions(response: Response, expect: dict[str, Any]) -> list[str]:
     """Return redacted diagnostics, never response bodies, values or headers."""
     failures = []
@@ -65,7 +69,7 @@ def assertions(response: Response, expect: dict[str, Any]) -> list[str]:
             failures.append("response header assertion failed")
     if "json" in expect:
         try:
-            document = json.loads(response.body)
+            document = json.loads(response.body, parse_constant=_nonfinite)
         except (json.JSONDecodeError, UnicodeError, ValueError):
             failures.append("response is not valid JSON")
         else:

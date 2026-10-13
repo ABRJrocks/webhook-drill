@@ -204,6 +204,10 @@ class AssertionTests(unittest.TestCase):
                                           "max_elapsed_ms": 10, "json": {"": {}}})
         self.assertEqual(len(failures), 4)
 
+    def test_non_finite_response_json_is_rejected(self):
+        self.assertTrue(assertions(Response(200, {}, b'{"n":NaN}', 1),
+                                   {"status": [200], "json": {"/n": 1}}))
+
     def test_retry_after_seconds_dates_and_caps(self):
         self.assertEqual(retry_delay("10", 1, .1, 2), 2)
         self.assertEqual(retry_delay("0", 3, .1, 2), .4)

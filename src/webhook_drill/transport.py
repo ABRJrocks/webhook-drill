@@ -31,10 +31,10 @@ def validate_target(url: str, allow_remote: bool = False) -> Target:
         raise SuiteError("target must be an ASCII HTTP(S) origin")
     try:
         parsed = urlsplit(url)
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        port = parsed.port if parsed.port is not None else (443 if parsed.scheme == "https" else 80)
     except ValueError as exc:
         raise SuiteError("invalid target origin") from exc
-    if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+    if (parsed.scheme not in {"http", "https"} or not parsed.hostname or not 1 <= port <= 65535
             or parsed.username is not None or parsed.password is not None
             or parsed.path not in {"", "/"} or parsed.query or parsed.fragment):
         raise SuiteError("target must be an HTTP(S) origin without credentials, path, query or fragment")

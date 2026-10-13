@@ -58,6 +58,25 @@ class SuiteTests(unittest.TestCase):
             with self.subTest(data=data), self.assertRaises(SuiteError):
                 self.load(data)
 
+    def test_invalid_structural_types_raise_configuration_errors(self):
+        for field in ("provider", "secret_env"):
+            data = minimal()
+            data["signing"] = {"provider": "github", "secret_env": "KEY", field: []}
+            with self.subTest(field=field), self.assertRaises(SuiteError):
+                self.load(data, {"KEY": "secret"})
+        for field, value in [("signature", []), ("expect", {"error": []})]:
+            data = minimal()
+            data["scenarios"][0]["steps"][0]["send"][field] = value
+            with self.subTest(field=field), self.assertRaises(SuiteError):
+                self.load(data)
+
+    def test_header_templates_do_not_modify_environment_credentials(self):
+        data = minimal()
+        data["headers"] = {"X-Event-ID": "{{run_id}}-event", "Authorization": {"env": "AUTH"}}
+        headers = self.load(data, {"AUTH": "literal-{{run_id}}"}).scenarios[0].steps[0].headers
+        self.assertEqual(headers["X-Event-ID"], "test-run-event")
+        self.assertEqual(headers["Authorization"], "literal-{{run_id}}")
+
     def test_missing_secret_fails_before_execution(self):
         data = minimal()
         data["signing"] = {"provider": "github", "secret_env": "KEY"}
